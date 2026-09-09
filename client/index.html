@@ -187,8 +187,15 @@
 
       <!-- knowledge-canvas extension: semantic graph overlay on qibu base -->
       <div class="knowledge-graph-view" id="knowledge-graph-view">
-        <div class="knowledge-graph-header"><strong data-i18n="knowledgeGraphTitle">知识图谱</strong><span id="knowledge-graph-count"></span></div>
+        <div class="knowledge-graph-header">
+          <strong data-i18n="knowledgeGraphTitle">知识图谱</strong>
+          <span id="knowledge-graph-count"></span>
+          <select id="knowledge-relation-filter" aria-label="筛选知识关系">
+            <option value="all">全部关系</option><option value="延伸">延伸</option><option value="相似">相似</option><option value="对比">对比</option><option value="依赖">依赖</option><option value="补充">补充</option>
+          </select>
+        </div>
         <div class="knowledge-graph-scroll"><svg id="knowledge-graph-svg"></svg></div>
+        <aside class="knowledge-graph-detail hidden" id="knowledge-graph-detail"></aside>
       </div>
 
       <!-- Floating Toolbar for Pointer/Pan Mode -->
@@ -352,6 +359,6 @@
   <script src="scripts/importer.js?v=1"></script>
   <script src="scripts/chat.js?v=51"></script>
   <script src="scripts/knowledge-extension.js?v=1"></script>
-  <script src="app.js?v=77"></script>
+  <script src="app.js?v=78"></script>
 </body>
 </html>

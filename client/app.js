@@ -1457,6 +1457,7 @@ function chatBranchLabel(branchNode) {
 // ---- Tree view: collapsible tree + "list by conversation" sub-mode ----
 let treeMode = false;
 let knowledgeGraphMode = false;
+let knowledgeGraphRelationFilter = 'all';
 let treeSubMode = 'tree'; // 'tree' | 'convos'
 const treeHidden = new Set(); // node ids whose branch (subtree, incl. itself) is collapsed away
 
@@ -1516,7 +1517,7 @@ function renderKnowledgeGraphView() {
   const svg = document.getElementById('knowledge-graph-svg');
   const count = document.getElementById('knowledge-graph-count');
   if (!svg) return;
-  const semantic = visibleKnowledgeEdges();
+  const semantic = visibleKnowledgeEdges().filter(edge => knowledgeGraphRelationFilter === 'all' || edge.relation === knowledgeGraphRelationFilter);
   const width = Math.max(960, canvasViewport?.clientWidth || 960);
   const rowGap = 220;
   const colGap = 360;
@@ -1549,10 +1550,28 @@ function renderKnowledgeGraphView() {
     group.querySelector('.knowledge-graph-node-title').textContent = node.knowledge?.title || node.question || `卡片 ${index + 1}`;
     group.querySelector('.knowledge-graph-node-meta').textContent = node.knowledge?.category || (node.role === 'dialogue' ? '对话' : '卡片');
     group.querySelector('.knowledge-graph-node-body').textContent = String(node.knowledge?.summary_a || node.content || '').slice(0, 32);
-    group.addEventListener('click', () => { setKnowledgeGraphMode(false); selectCardNode(node.id); centerOnNode(node.id); });
+    group.addEventListener('click', () => showKnowledgeGraphDetail(node));
     svg.appendChild(group);
   });
   if (count) count.textContent = `${nodes.length} 张卡片 · ${semantic.length} 条语义关系`;
+}
+
+function showKnowledgeGraphDetail(node) {
+  const detail = document.getElementById('knowledge-graph-detail');
+  if (!detail || !node) return;
+  const knowledge = node.knowledge || {};
+  const relations = knowledgeEdges.filter(edge => edge.source === node.id || edge.target === node.id);
+  detail.innerHTML = `<button class="knowledge-detail-close" type="button">×</button><h3></h3><div class="knowledge-detail-meta"></div><p class="knowledge-detail-q"></p><p class="knowledge-detail-a"></p><div class="knowledge-detail-links"></div><button class="btn btn-outline knowledge-detail-locate" type="button">↩ 在白板中查看</button>`;
+  detail.querySelector('h3').textContent = knowledge.title || node.question || '知识卡片';
+  detail.querySelector('.knowledge-detail-meta').textContent = `${knowledge.category || '其他'} · ${knowledge.source || 'qibu'}`;
+  detail.querySelector('.knowledge-detail-q').textContent = `问：${knowledge.summary_q || node.question || ''}`;
+  detail.querySelector('.knowledge-detail-a').textContent = `答：${knowledge.summary_a || node.content || ''}`;
+  detail.querySelector('.knowledge-detail-links').textContent = relations.length
+    ? `关联：${relations.map(edge => `${edge.relation}${edge.reason ? `（${edge.reason}）` : ''}`).join('；')}`
+    : '暂无语义关联';
+  detail.querySelector('.knowledge-detail-close').addEventListener('click', () => detail.classList.add('hidden'));
+  detail.querySelector('.knowledge-detail-locate').addEventListener('click', () => { detail.classList.add('hidden'); setKnowledgeGraphMode(false); selectCardNode(node.id); centerOnNode(node.id); });
+  detail.classList.remove('hidden');
 }
 
 function treeRealVisibleChildren(realId) {
@@ -4535,6 +4554,11 @@ function setupEventListeners() {
       setKnowledgeGraphMode(!knowledgeGraphMode);
     });
   }
+  const knowledgeRelationFilter = document.getElementById('knowledge-relation-filter');
+  if (knowledgeRelationFilter) knowledgeRelationFilter.addEventListener('change', event => {
+    knowledgeGraphRelationFilter = event.target.value || 'all';
+    renderKnowledgeGraphView();
+  });
 
   // Tree sub-mode toggle (tree vs list-by-conversation) + conversation preview
   const subTreeBtn = document.getElementById('tree-sub-tree');

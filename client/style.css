@@ -2846,6 +2846,7 @@ body.knowledge-graph-mode .chat-view,
 body.knowledge-graph-mode .tree-view { visibility: hidden; }
 .knowledge-graph-header { flex: 0 0 auto; display: flex; align-items: center; gap: 16px; padding: 12px 18px; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary); }
 .knowledge-graph-header span { color: var(--text-secondary); font-size: 12px; }
+.knowledge-graph-header select { margin-left: auto; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; }
 .knowledge-graph-scroll { flex: 1; overflow: auto; }
 #knowledge-graph-svg { min-width: 100%; min-height: 100%; }
 .knowledge-graph-edge { fill: none; stroke: var(--neon-purple); stroke-width: 2.4; stroke-dasharray: 8 6; opacity: .78; }
@@ -2857,6 +2858,13 @@ body.knowledge-graph-mode .tree-view { visibility: hidden; }
 .knowledge-graph-node-meta { fill: var(--neon-blue); font-size: 11px; }
 .knowledge-graph-node-body { fill: var(--text-secondary); font-size: 11px; }
 .canvas-controls #knowledge-graph-mode-btn.active { background-color: var(--neon-purple); color: #fff; box-shadow: 0 0 10px var(--neon-purple); }
+.knowledge-graph-detail { position: absolute; top: 64px; right: 18px; width: 320px; max-height: calc(100% - 84px); overflow-y: auto; z-index: 5; padding: 18px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-lg); }
+.knowledge-graph-detail.hidden { display: none; }
+.knowledge-graph-detail h3 { margin: 0 24px 8px 0; color: var(--text-primary); font-size: 16px; }
+.knowledge-graph-detail p, .knowledge-detail-meta, .knowledge-detail-links { color: var(--text-secondary); font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
+.knowledge-detail-meta { color: var(--neon-blue); margin-bottom: 12px; }
+.knowledge-detail-close { position: absolute; top: 10px; right: 12px; border: 0; background: transparent; color: var(--text-secondary); font-size: 20px; cursor: pointer; }
+.knowledge-detail-locate { margin-top: 14px; width: 100%; }
 
 .tree-modebar {
   flex: 0 0 auto;
