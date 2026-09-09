@@ -110,8 +110,10 @@ def extract_cards(messages: list[dict[str, Any]], provider: str = "dry-run", end
     if provider == "cloud":
         result = _json_from_openai(endpoint, model, [{"role": "system", "content": "只输出 JSON：{cards:[{title,category,summary_q,summary_a,keywords}]}"}, {"role": "user", "content": json.dumps(messages, ensure_ascii=False)}], api_key)
         cards = result.get("cards", [])
-        for index, card in enumerate(cards, 1):
-            card.setdefault("id", f"qa-{index:04d}"); card.setdefault("category", "其他"); card.setdefault("keywords", []); card["_status"] = "ok"
+    for index, card in enumerate(cards, 1):
+        card.setdefault("id", f"qa-{index:04d}"); card.setdefault("category", "其他"); card.setdefault("keywords", []); card["_status"] = "ok"
+        if isinstance(card.get("keywords"), str):
+            card["keywords"] = [item.strip() for item in card["keywords"].split(",") if item.strip()]
         return cards
     if provider != "local":
         raise ValueError("支持的 provider：dry-run、local、cloud")
@@ -139,7 +141,12 @@ def link_cards(cards: list[dict[str, Any]], provider: str = "dry-run", endpoint:
         raise ValueError("支持的 provider：dry-run、local、cloud")
     links = []
     valid = {card.get("id") for card in cards}
+    seen: set[tuple[str, str]] = set()
     for link in result.get("links", []):
         if link.get("source") in valid and link.get("target") in valid and link.get("source") != link.get("target"):
+            key = tuple(sorted((link["source"], link["target"])))
+            if key in seen:
+                continue
+            seen.add(key)
             links.append({"source": link["source"], "target": link["target"], "relation": link.get("relation") if link.get("relation") in RELATIONS else "补充", "reason": str(link.get("reason", ""))[:80], "confidence": link.get("confidence")})
     return links
