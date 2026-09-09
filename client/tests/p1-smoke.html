@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MindChat P1 Smoke Tests</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 32px;
+      color: #172033;
+      background: #f6f8fb;
+    }
+
+    h1 {
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
+
+    pre {
+      padding: 16px;
+      border: 1px solid #d7deea;
+      border-radius: 8px;
+      background: #fff;
+      white-space: pre-wrap;
+    }
+
+    .pass {
+      color: #176d3a;
+      font-weight: 700;
+    }
+
+    .fail {
+      color: #b42318;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <h1>MindChat P1 Smoke Tests</h1>
+  <pre id="result">Running...</pre>
+
+  <script src="../scripts/security.js?v=1"></script>
+  <script src="../scripts/storage.js?v=1"></script>
+  <script>
+    (async function () {
+      const lines = [];
+
+      function assert(name, condition) {
+        lines.push(`${condition ? 'PASS' : 'FAIL'} ${name}`);
+        if (!condition) throw new Error(name);
+      }
+
+      function makeMemoryStorage(initial = {}) {
+        const data = { ...initial };
+        return {
+          get length() {
+            return Object.keys(data).length;
+          },
+          key(index) {
+            return Object.keys(data)[index] || null;
+          },
+          getItem(key) {
+            return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null;
+          },
+          setItem(key, value) {
+            data[key] = String(value);
+          },
+          removeItem(key) {
+            delete data[key];
+          }
+        };
+      }
+
+      try {
+        const security = window.MindChatModules.createSecurityModule();
+        const probe = document.createElement('div');
+        probe.innerHTML = security.renderMarkdown('# Title\n**bold**\n<img src=x onerror="window.__smokeXss=1">\n```js\nconst x = 1;\n```');
+        document.body.appendChild(probe);
+        assert('security module exists', !!security.renderMarkdown);
+        assert('markdown heading is preserved', !!probe.querySelector('h1'));
+        assert('markdown strong is preserved', !!probe.querySelector('strong'));
+        assert('code language class is preserved', !!probe.querySelector('code.language-js'));
+        assert('unsafe img tag is removed', !probe.querySelector('img'));
+        assert('inline event did not execute', !window.__smokeXss);
+        probe.remove();
+
+        const localStore = makeMemoryStorage({
+          mindchat_config: JSON.stringify({
+            provider: 'gemini',
+            apiKey: 'LEGACY_SECRET',
+            endpoint: 'https://example.invalid',
+            model: 'safe-model'
+          })
+        });
+        const sessionStore = makeMemoryStorage();
+        const storage = window.MindChatModules.createStorageModule({
+          localStorage: localStore,
+          sessionStorage: sessionStore,
+          currentLang: () => 'en',
+          notify: () => {}
+        });
+        const loaded = storage.loadConfig({
+          provider: 'mock',
+          apiKey: '',
+          endpoint: '',
+          model: ''
+        });
+        const persisted = JSON.parse(localStore.getItem('mindchat_config'));
+        assert('storage module exists', !!storage.safeSet);
+        assert('legacy api key is loaded into config', loaded.apiKey === 'LEGACY_SECRET');
+        assert('legacy api key is moved to session storage', sessionStore.getItem('mindchat_api_key_session') === 'LEGACY_SECRET');
+        assert('api key is removed from local storage', !Object.prototype.hasOwnProperty.call(persisted, 'apiKey'));
+
+        storage.saveConfig({ ...loaded, apiKey: 'NEW_SECRET' });
+        const saved = JSON.parse(localStore.getItem('mindchat_config'));
+        assert('new api key stays out of local storage', !Object.prototype.hasOwnProperty.call(saved, 'apiKey'));
+        assert('new api key is session scoped', sessionStore.getItem('mindchat_api_key_session') === 'NEW_SECRET');
+
+        const idbLocalStore = makeMemoryStorage({
+          mindchat_board_alpha: '[{"id":"a"}]',
+          mindchat_annotations_alpha: '[{"id":"note"}]',
+          unrelated_key: 'ignored'
+        });
+        const idbStorage = window.MindChatModules.createStorageModule({
+          localStorage: idbLocalStore,
+          sessionStorage: makeMemoryStorage(),
+          dbName: `mindchat_smoke_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+          currentLang: () => 'en',
+          notify: () => {}
+        });
+        assert('indexedDB facade is available', idbStorage.indexedDb.isAvailable());
+        await idbStorage.indexedDb.set('mindchat_probe', 'ok');
+        assert('indexedDB value can be read', await idbStorage.indexedDb.get('mindchat_probe') === 'ok');
+        const migratedKeys = await idbStorage.indexedDb.migrateLocalStorageKeys('mindchat_');
+        assert('indexedDB migration includes board key', migratedKeys.includes('mindchat_board_alpha'));
+        assert('indexedDB migration includes annotations key', migratedKeys.includes('mindchat_annotations_alpha'));
+        assert('indexedDB migration ignores unrelated keys', !migratedKeys.includes('unrelated_key'));
+        assert('indexedDB migrated board value can be read', await idbStorage.indexedDb.get('mindchat_board_alpha') === '[{"id":"a"}]');
+        const idbKeys = await idbStorage.indexedDb.keys('mindchat_');
+        assert('indexedDB keys can be listed by prefix', idbKeys.includes('mindchat_probe') && idbKeys.includes('mindchat_board_alpha'));
+        await idbStorage.indexedDb.remove('mindchat_probe');
+        assert('indexedDB value can be removed', await idbStorage.indexedDb.get('mindchat_probe') === null);
+
+        document.getElementById('result').innerHTML = `<span class="pass">All tests passed</span>\n\n${lines.join('\n')}`;
+      } catch (err) {
+        document.getElementById('result').innerHTML = `<span class="fail">Test failed</span>\n\n${lines.join('\n')}\n\n${err.stack || err.message}`;
+      }
+    })();
+  </script>
+</body>
+</html>

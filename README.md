@@ -22,7 +22,13 @@ start-bridge.bat
 python -m http.server 8790 -d web
 ```
 
-打开 <http://127.0.0.1:8790/>。
+正式白板入口使用 qibu 基座：
+
+```powershell
+python -m http.server 8800 -d client
+```
+
+打开 <http://127.0.0.1:8800/index.html>。旧 `web/` 目录保留为 M0/M2 原型参考，不是正式入口。
 
 ## 当前能力
 

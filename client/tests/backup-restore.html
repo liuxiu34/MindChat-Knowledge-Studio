@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MindChat Backup Restore Tests</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 32px;
+      color: #172033;
+    }
+
+    #result {
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+
+    .pass {
+      color: #087f5b;
+    }
+
+    .fail {
+      color: #c92a2a;
+    }
+
+    iframe {
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+      position: fixed;
+      right: 0;
+      bottom: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>MindChat Backup Restore Tests</h1>
+  <div id="result">Running...</div>
+  <iframe id="app-frame" src="../index.html?backup-restore-test=1"></iframe>
+
+  <script>
+    const resultEl = document.getElementById('result');
+    const frame = document.getElementById('app-frame');
+
+    function writeResult(lines, failed) {
+      resultEl.className = failed ? 'fail' : 'pass';
+      resultEl.textContent = lines.join('\n');
+    }
+
+    function assert(condition, label, lines) {
+      lines.push(`${condition ? 'PASS' : 'FAIL'} ${label}`);
+      if (!condition) throw new Error(label);
+    }
+
+    function injectAppTest() {
+      const script = frame.contentDocument.createElement('script');
+      script.textContent = `
+        (async () => {
+          const originalBackup = await createWorkspaceBackup();
+          const testCanvasId = 'canvas_backup_test_' + Date.now();
+          const testLibrary = [{
+            id: 'folder_backup_test',
+            name: 'Backup Test',
+            canvases: [{ id: testCanvasId, name: 'Backup Canvas' }]
+          }];
+          const testBoardKey = 'mindchat_board_' + testCanvasId;
+          const testAnnotationsKey = 'mindchat_annotations_' + testCanvasId;
+          const testBoard = JSON.stringify([{
+            id: 'backup-node',
+            role: 'user',
+            content: 'backup restore node',
+            parentId: null,
+            x: 25000,
+            y: 25000
+          }]);
+          const testAnnotations = JSON.stringify([{
+            id: 'backup-annotation',
+            text: 'backup restore annotation',
+            x: 25020,
+            y: 25020
+          }]);
+          const temporaryBackup = {
+            format: 'mindchat-workspace-backup',
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            activeCanvasId: testCanvasId,
+            localStorage: {
+              mindchat_library: JSON.stringify(testLibrary),
+              mindchat_active_canvas_id: testCanvasId,
+              mindchat_collapsed_folders: JSON.stringify(['folder_backup_test']),
+              [testBoardKey]: testBoard,
+              [testAnnotationsKey]: testAnnotations
+            },
+            indexedDb: {
+              [testBoardKey]: testBoard,
+              [testAnnotationsKey]: testAnnotations
+            }
+          };
+
+          try {
+            await restoreWorkspaceBackup(temporaryBackup, { skipConfirm: true, silent: true });
+            const restoredBackup = await createWorkspaceBackup();
+            const boardMirror = await storageModule.indexedDb.get(testBoardKey);
+            const annotationsMirror = await storageModule.indexedDb.get(testAnnotationsKey);
+            window.__backupRestoreResult = {
+              isBackup: isWorkspaceBackup(restoredBackup),
+              activeCanvasId,
+              library,
+              nodes,
+              annotations,
+              restoredBackup,
+              boardMirror,
+              annotationsMirror
+            };
+          } catch (err) {
+            window.__backupRestoreError = err.message || String(err);
+          } finally {
+            await restoreWorkspaceBackup(originalBackup, { skipConfirm: true, silent: true });
+          }
+        })();
+      `;
+      frame.contentDocument.documentElement.appendChild(script);
+    }
+
+    frame.addEventListener('load', () => {
+      injectAppTest();
+    });
+
+    (async () => {
+      const lines = ['MindChat Backup Restore Tests'];
+      try {
+        for (let i = 0; i < 60; i += 1) {
+          const win = frame.contentWindow;
+          if (win.__backupRestoreError) throw new Error(win.__backupRestoreError);
+          if (win.__backupRestoreResult) {
+            const result = win.__backupRestoreResult;
+            assert(result.isBackup, 'created workspace backup has expected format', lines);
+            assert(result.activeCanvasId.startsWith('canvas_backup_test_'), 'restore activates backup canvas', lines);
+            assert(result.library[0].canvases[0].id === result.activeCanvasId, 'restore replaces library metadata', lines);
+            assert(result.nodes.some(node => node.id === 'backup-node'), 'restore loads board nodes', lines);
+            assert(result.annotations.some(annotation => annotation.id === 'backup-annotation'), 'restore loads annotations', lines);
+            assert(result.restoredBackup.localStorage.mindchat_library, 'backup includes localStorage library metadata', lines);
+            assert(Object.keys(result.restoredBackup.indexedDb).some(key => key.includes(result.activeCanvasId)), 'backup includes IndexedDB canvas data', lines);
+            assert(result.boardMirror && result.boardMirror.includes('backup-node'), 'restore writes board mirror to IndexedDB', lines);
+            assert(result.annotationsMirror && result.annotationsMirror.includes('backup-annotation'), 'restore writes annotations mirror to IndexedDB', lines);
+            writeResult(lines, false);
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        throw new Error('Timed out waiting for backup restore test result');
+      } catch (err) {
+        lines.push(`FAIL ${err.message || err}`);
+        writeResult(lines, true);
+      }
+    })();
+  </script>
+</body>
+</html>

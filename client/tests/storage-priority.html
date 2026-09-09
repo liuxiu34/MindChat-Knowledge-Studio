@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MindChat Storage Priority Tests</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 32px;
+      color: #172033;
+    }
+
+    #result {
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+
+    .pass {
+      color: #087f5b;
+    }
+
+    .fail {
+      color: #c92a2a;
+    }
+
+    iframe {
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+      position: fixed;
+      right: 0;
+      bottom: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>MindChat Storage Priority Tests</h1>
+  <div id="result">Running...</div>
+  <iframe id="app-frame" src="../index.html?storage-priority-test=1"></iframe>
+
+  <script>
+    const resultEl = document.getElementById('result');
+    const frame = document.getElementById('app-frame');
+
+    function writeResult(lines, failed) {
+      resultEl.className = failed ? 'fail' : 'pass';
+      resultEl.textContent = lines.join('\n');
+    }
+
+    function assert(condition, label, lines) {
+      lines.push(`${condition ? 'PASS' : 'FAIL'} ${label}`);
+      if (!condition) throw new Error(label);
+    }
+
+    function injectAppTest() {
+      const script = frame.contentDocument.createElement('script');
+      script.textContent = `
+        (async () => {
+          const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+          const previousCanvasId = activeCanvasId;
+          const previousNodes = nodes;
+          const previousAnnotations = annotations;
+          const makeNode = (id, content, x) => ({
+            id,
+            type: 'user',
+            title: content,
+            content,
+            x,
+            y: 120,
+            width: 260,
+            height: 160,
+            parentId: null,
+            children: [],
+            attachments: [],
+            createdAt: new Date().toISOString()
+          });
+          const makeAnnotation = (id, text, x) => ({
+            id,
+            text,
+            x,
+            y: 220,
+            color: '#f5a623',
+            authorName: 'codex',
+            createdAt: new Date().toISOString(),
+            messages: []
+          });
+
+          const primaryId = 'codex_storage_primary_' + Date.now();
+          const primaryBoardKey = 'mindchat_board_' + primaryId;
+          const primaryAnnoKey = 'mindchat_annotations_' + primaryId;
+          const localNodes = [makeNode('local-node', 'local preview node', 10)];
+          const idbNodes = [makeNode('idb-node', 'indexeddb primary node', 30)];
+          const localAnnotations = [makeAnnotation('local-annotation', 'local preview annotation', 10)];
+          const idbAnnotations = [makeAnnotation('idb-annotation', 'indexeddb primary annotation', 30)];
+
+          const fallbackId = 'codex_storage_fallback_' + Date.now();
+          const fallbackBoardKey = 'mindchat_board_' + fallbackId;
+          const fallbackAnnoKey = 'mindchat_annotations_' + fallbackId;
+          const fallbackNodes = [makeNode('fallback-local-node', 'fallback local node', 50)];
+          const fallbackAnnotations = [makeAnnotation('fallback-local-annotation', 'fallback local annotation', 50)];
+
+          try {
+            localStorage.setItem(primaryBoardKey, JSON.stringify(localNodes));
+            localStorage.setItem(primaryAnnoKey, JSON.stringify(localAnnotations));
+            await storageModule.indexedDb.set(primaryBoardKey, JSON.stringify(idbNodes));
+            await storageModule.indexedDb.set(primaryAnnoKey, JSON.stringify(idbAnnotations));
+
+            activeCanvasId = primaryId;
+            loadBoard();
+            await wait(700);
+
+            const primaryResult = {
+              nodes: nodes.map(node => node.id),
+              annotations: annotations.map(annotation => annotation.id),
+              localBoard: JSON.parse(localStorage.getItem(primaryBoardKey)).map(node => node.id),
+              localAnnotations: JSON.parse(localStorage.getItem(primaryAnnoKey)).map(annotation => annotation.id),
+              idbBoard: JSON.parse(await storageModule.indexedDb.get(primaryBoardKey)).map(node => node.id),
+              idbAnnotations: JSON.parse(await storageModule.indexedDb.get(primaryAnnoKey)).map(annotation => annotation.id)
+            };
+
+            localStorage.setItem(fallbackBoardKey, JSON.stringify(fallbackNodes));
+            localStorage.setItem(fallbackAnnoKey, JSON.stringify(fallbackAnnotations));
+            await storageModule.indexedDb.remove(fallbackBoardKey);
+            await storageModule.indexedDb.remove(fallbackAnnoKey);
+
+            activeCanvasId = fallbackId;
+            loadBoard();
+            await wait(700);
+
+            const fallbackResult = {
+              nodes: nodes.map(node => node.id),
+              annotations: annotations.map(annotation => annotation.id),
+              localBoard: JSON.parse(localStorage.getItem(fallbackBoardKey)).map(node => node.id),
+              localAnnotations: JSON.parse(localStorage.getItem(fallbackAnnoKey)).map(annotation => annotation.id),
+              idbBoard: await storageModule.indexedDb.get(fallbackBoardKey),
+              idbAnnotations: await storageModule.indexedDb.get(fallbackAnnoKey)
+            };
+            const diagnosticsRows = await getDiagnosticsAsyncRows();
+
+            window.__storagePriorityResult = { primaryResult, fallbackResult, diagnosticsRows };
+          } catch (err) {
+            window.__storagePriorityError = err.message || String(err);
+          } finally {
+            [primaryBoardKey, primaryAnnoKey, fallbackBoardKey, fallbackAnnoKey].forEach(key => localStorage.removeItem(key));
+            await storageModule.indexedDb.remove(primaryBoardKey);
+            await storageModule.indexedDb.remove(primaryAnnoKey);
+            await storageModule.indexedDb.remove(fallbackBoardKey);
+            await storageModule.indexedDb.remove(fallbackAnnoKey);
+            activeCanvasId = previousCanvasId;
+            nodes = previousNodes;
+            annotations = previousAnnotations;
+            renderBoard();
+            renderAnnotations();
+          }
+        })();
+      `;
+      frame.contentDocument.documentElement.appendChild(script);
+    }
+
+    frame.addEventListener('load', () => {
+      injectAppTest();
+    });
+
+    (async () => {
+      const lines = ['MindChat Storage Priority Tests'];
+      try {
+        for (let i = 0; i < 50; i += 1) {
+          const win = frame.contentWindow;
+          if (win.__storagePriorityError) throw new Error(win.__storagePriorityError);
+          if (win.__storagePriorityResult) {
+            const { primaryResult, fallbackResult, diagnosticsRows } = win.__storagePriorityResult;
+            const diagnosticsLabels = diagnosticsRows.map(row => row[0]);
+            const boardMirrorRow = diagnosticsRows.find(row => row[0] === 'Current board mirror') || [];
+            assert(primaryResult.nodes.includes('idb-node'), 'IndexedDB board overrides local preview', lines);
+            assert(primaryResult.annotations.includes('idb-annotation'), 'IndexedDB annotations override local preview', lines);
+            assert(primaryResult.localBoard.includes('idb-node'), 'primary board writes back to localStorage', lines);
+            assert(primaryResult.localAnnotations.includes('idb-annotation'), 'primary annotations write back to localStorage', lines);
+            assert(primaryResult.idbBoard.includes('idb-node'), 'primary board remains in IndexedDB', lines);
+            assert(primaryResult.idbAnnotations.includes('idb-annotation'), 'primary annotations remain in IndexedDB', lines);
+            assert(fallbackResult.nodes.includes('fallback-local-node'), 'local board remains when IndexedDB is empty', lines);
+            assert(fallbackResult.annotations.includes('fallback-local-annotation'), 'local annotations remain when IndexedDB is empty', lines);
+            assert(fallbackResult.localBoard.includes('fallback-local-node'), 'fallback board stays in localStorage', lines);
+            assert(fallbackResult.localAnnotations.includes('fallback-local-annotation'), 'fallback annotations stay in localStorage', lines);
+            assert(diagnosticsLabels.includes('IndexedDB mirror coverage'), 'diagnostics reports mirror coverage', lines);
+            assert(boardMirrorRow[1] === 'local only - run mirror sync', 'diagnostics reports local-only board mirror', lines);
+            writeResult(lines, false);
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        throw new Error('Timed out waiting for app storage test result');
+      } catch (err) {
+        lines.push(`FAIL ${err.message || err}`);
+        writeResult(lines, true);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MindChat Importer Smoke Tests</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 32px;
+      color: #172033;
+      background: #f6f8fb;
+    }
+
+    pre {
+      padding: 16px;
+      border: 1px solid #d7deea;
+      border-radius: 8px;
+      background: #fff;
+      white-space: pre-wrap;
+    }
+
+    .pass {
+      color: #176d3a;
+      font-weight: 700;
+    }
+
+    .fail {
+      color: #b42318;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <h1>MindChat Importer Smoke Tests</h1>
+  <pre id="result">Running...</pre>
+
+  <script src="../scripts/importer.js?v=1"></script>
+  <script>
+    (function () {
+      const lines = [];
+
+      function assert(name, condition) {
+        lines.push(`${condition ? 'PASS' : 'FAIL'} ${name}`);
+        if (!condition) throw new Error(name);
+      }
+
+      try {
+        const importer = window.MindChatModules.createImporterModule();
+        const jsonMessages = importer.parseChatLog(JSON.stringify({
+          messages: [
+            { role: 'user', content: 'hello', timestamp: '10:00' },
+            { role: 'assistant', content: 'hi', timestamp: '10:01' }
+          ]
+        }), 'json');
+        assert('json messages are parsed', jsonMessages.length === 2);
+        assert('assistant role is normalized', jsonMessages[1].role === 'assistant');
+
+        const textMessages = importer.parseChatLog('User:\n10:00\nQuestion one\nAssistant:\nAnswer one', 'text');
+        assert('text messages are parsed', textMessages.length === 2);
+        assert('text timestamp is captured', textMessages[0].timestamp === '10:00');
+        assert('text content keeps body', textMessages[0].content === 'Question one');
+
+        const zhMessages = importer.parseChatLog('用户：你好\n助手：你好呀', 'text');
+        assert('Chinese sender labels are parsed', zhMessages.length === 2);
+
+        const geminiText = importer.parseChatLog('From: https://example.com\n\nyou asked\nmessage time: 2026-09-08 22:31:58\n\n第一个问题？\n\ngemini response\nmessage time: 2026-09-08 22:31:58\n\n这是第一个回答，内容足够长。\n\nyou asked\n第二个问题？\n\ngemini response\n这是第二个回答，内容足够长。', 'text');
+        assert('Gemini export labels are parsed', geminiText.length === 4);
+        assert('Gemini export creates two dialogue cards', importer.createImportCardItems(geminiText).length === 2);
+
+        const geminiJson = importer.parseChatLog(JSON.stringify([
+          { role: 'user', contents: [{ type: 'text', content: 'JSON 第一个问题？' }] },
+          { role: 'assistant', contents: [{ type: 'text', content: 'JSON 第一个回答，内容足够长。' }] }
+        ]), 'json');
+        assert('Gemini JSON contents are parsed', geminiJson.length === 2 && geminiJson[0].content === 'JSON 第一个问题？');
+
+        const cardItems = importer.createImportCardItems(jsonMessages);
+        assert('adjacent user assistant messages merge into dialogue', cardItems.length === 1 && cardItems[0].role === 'dialogue');
+        assert('dialogue keeps question', cardItems[0].question === 'hello');
+        assert('dialogue keeps answer', cardItems[0].content === 'hi');
+
+        const longQuestion = `${'x'.repeat(501)}`;
+        const splitItems = importer.createImportCardItems([
+          { role: 'user', content: longQuestion },
+          { role: 'assistant', content: 'answer' }
+        ]);
+        assert('long questions are not merged', splitItems.length === 2);
+
+        document.getElementById('result').innerHTML = `<span class="pass">All tests passed</span>\n\n${lines.join('\n')}`;
+      } catch (err) {
+        document.getElementById('result').innerHTML = `<span class="fail">Test failed</span>\n\n${lines.join('\n')}\n\n${err.stack || err.message}`;
+      }
+    })();
+  </script>
+</body>
+</html>

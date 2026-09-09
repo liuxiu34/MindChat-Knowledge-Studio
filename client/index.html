@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MindChat Canvas - 白板卡片式 AI 对话画布</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=62">
+</head>
+<body>
+  <!-- App Container -->
+  <div class="app-container">
+    
+    <!-- Sidebar Control Panel -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="header-top">
+          <div class="logo">
+            <svg class="logo-icon" viewBox="0 0 24 24" width="24" height="24">
+              <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/>
+            </svg>
+            <h1 data-i18n="title">MindChat Canvas</h1>
+          </div>
+          <button id="theme-toggle-btn" class="lang-toggle-btn" data-i18n-title="themeToggleTitle" title="切换主题（深色 / 浅色）">🌙</button>
+          <button id="lang-toggle-btn" class="lang-toggle-btn">EN</button>
+        </div>
+        <p class="tagline" data-i18n="tagline">分支对话 / 思路白板</p>
+      </div>
+
+      <div class="sidebar-scroll">
+        <!-- Global Search -->
+        <section class="settings-section search-section">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="global-search-input" data-i18n-ph="searchPlaceholder" placeholder="搜索卡片内容…" autocomplete="off">
+          </div>
+          <div class="search-results hidden" id="search-results"></div>
+        </section>
+
+        <!-- Project Library Section -->
+        <section class="settings-section explorer-section">
+          <div class="explorer-title-row">
+            <h3 data-i18n="folderTitle"><span class="icon">📁</span> 画布库</h3>
+            <button id="add-folder-btn" class="icon-btn" data-i18n="addFolderBtn" title="创建新项目/文件夹">＋ 文件夹</button>
+          </div>
+          <div class="explorer-tree" id="explorer-tree">
+            <!-- Populated dynamically via JS -->
+          </div>
+        </section>
+
+        <!-- AI Setting section -->
+        <section class="settings-section">
+          <h3 data-i18n="aiSettings"><span class="icon">🤖</span>AI 引擎设置</h3>
+          
+          <div class="form-group">
+            <label for="ai-provider" data-i18n="provider">服务商</label>
+            <select id="ai-provider">
+              <option value="mock" data-i18n="mockAi">✨ 模拟 AI (免密钥体验)</option>
+              <option value="gemini" data-i18n="geminiApi">Gemini API (原生接口)</option>
+              <option value="custom" data-i18n="customLlm">Custom LLM (兼容 API)</option>
+            </select>
+          </div>
+
+          <button id="toggle-config-btn" class="btn btn-outline hidden" data-i18n="toggleConfig">⚙️ 配置 API</button>
+
+          <div id="api-keys-container" class="hidden-fields">
+            <div class="form-group">
+              <label for="api-key" data-i18n="apiKey">API 密钥 (API Key)</label>
+              <input type="password" id="api-key" placeholder="输入 API Key" autocomplete="off">
+              <p class="field-note" data-i18n="apiKeySessionNote">API Key 仅保存在当前浏览器会话中，关闭浏览器后需要重新输入。</p>
+            </div>
+
+            <div class="form-group">
+              <label for="api-endpoint" data-i18n="apiEndpoint">自定义 Endpoint</label>
+              <input type="text" id="api-endpoint" placeholder="例如: https://generativelanguage.googleapis.com">
+            </div>
+
+            <div class="form-group">
+              <label for="api-model" data-i18n="apiModel">模型名称</label>
+              <input type="text" id="api-model" placeholder="例如: gemini-2.5-flash">
+            </div>
+
+            <button id="save-config-btn" class="btn btn-primary" data-i18n="saveConfigBtn">保存配置</button>
+          </div>
+        </section>
+
+        <!-- Board Operations -->
+        <section class="settings-section">
+          <h3 data-i18n="boardManager"><span class="icon">💾</span>白板管理</h3>
+          <div class="btn-grid">
+            <button id="import-log-btn" class="btn btn-primary">
+              <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+              <span data-i18n="importChatLog">导入聊天记录</span>
+            </button>
+            <button id="add-node-btn" class="btn btn-secondary">
+              <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              <span data-i18n="newBlankCard">新建空白卡片</span>
+            </button>
+          </div>
+          <div class="btn-grid compact">
+            <button id="export-json-btn" class="btn btn-outline" data-i18n="exportJson">导出 JSON</button>
+            <button id="import-json-btn" class="btn btn-outline" data-i18n="importFile">导入文件 (.json/.txt)</button>
+          </div>
+          <button id="export-knowledge-btn" class="btn btn-outline" data-i18n="exportKnowledgeInput">导出知识分析输入 (.md)</button>
+          <button id="link-knowledge-btn" class="btn btn-outline" data-i18n="linkKnowledgeCards">关联当前卡片</button>
+          <div class="btn-grid compact">
+            <button id="export-backup-btn" class="btn btn-outline" data-i18n="exportBackup">导出完整备份</button>
+            <button id="import-backup-btn" class="btn btn-outline" data-i18n="importBackup">恢复完整备份</button>
+          </div>
+          <button id="diagnostics-btn" class="btn btn-outline" data-i18n="diagnosticsBtn">系统诊断</button>
+          <button id="clear-board-btn" class="btn btn-danger-outline" data-i18n="clearBoard">清空当前画布</button>
+          <input type="file" id="file-input" class="hidden" accept=".json,.txt,.log,.md,.markdown,.docx">
+          <input type="file" id="backup-file-input" class="hidden" accept=".json">
+        </section>
+
+        <!-- Instructions -->
+        <section class="settings-section instructions">
+          <h3 data-i18n="instructionsTitle"><span class="icon">💡</span>使用技巧</h3>
+          <ul id="instructions-list">
+            <!-- Populated dynamically via JS -->
+          </ul>
+        </section>
+      </div>
+
+      <div class="sidebar-footer">
+        <span class="status-indicator" id="status-indicator">
+          <span class="status-dot green"></span>
+          <span id="status-text" data-i18n="statusReady">系统就绪 (模拟 AI 模式)</span>
+        </span>
+      </div>
+    </aside>
+
+    <!-- Canvas Area -->
+    <main class="canvas-viewport" id="canvas-viewport">
+      
+      <!-- Infinite Transformable Canvas -->
+      <div class="canvas-grid" id="canvas">
+        <!-- SVG Connections layer -->
+        <svg class="svg-connections" id="svg-connections">
+          <defs>
+            <!-- Arrow markers -->
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="var(--connection-line-color)"/>
+            </marker>
+            <marker id="arrow-active" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="var(--neon-purple)"/>
+            </marker>
+          </defs>
+          <g id="svg-paths-group"></g>
+        </svg>
+
+        <!-- True 3D connection layer -->
+        <div class="connections-3d" id="connections-3d"></div>
+
+        <!-- Cards Overlay container -->
+        <div class="cards-container" id="cards-container"></div>
+
+        <!-- Canvas annotations layer -->
+        <div class="annotations-container" id="annotations-container"></div>
+
+        <!-- Selection Marquee box -->
+        <div id="selection-marquee" class="selection-marquee hidden"></div>
+      </div>
+
+      <!-- Chat view overlay: renders the conversation as a scrollable chat -->
+      <div class="chat-view" id="chat-view">
+        <div class="chat-view-inner" id="chat-view-inner"></div>
+      </div>
+
+      <!-- Tree view overlay: collapsible tree + "list by conversation" sub-mode -->
+      <div class="tree-view" id="tree-view">
+        <div class="tree-modebar">
+          <span class="tree-seg">
+            <button id="tree-sub-tree" class="active" data-i18n="treeSubTreeBtn">🌳 树状图</button>
+            <button id="tree-sub-convos" data-i18n="treeSubConvosBtn">≣ 按对话列出</button>
+          </span>
+          <span class="tree-convo-count" id="tree-convo-count"></span>
+          <button class="tree-new-chat hidden" id="tree-new-chat">＋ 新对话</button>
+        </div>
+        <div class="tree-scroll" id="tree-scroll">
+          <div class="tree-inner" id="tree-inner"></div>
+        </div>
+      </div>
+
+      <!-- Floating Toolbar for Pointer/Pan Mode -->
+      <div class="mode-toolbar" id="mode-toolbar">
+        <button id="mode-select-btn" class="mode-btn active" data-i18n-title="modeSelectTitle" title="选择与编辑模式 (V)">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M9.88 18.23l2.84-2.84 3.73 3.73c.39.39 1.02.39 1.41 0l1.41-1.41c.39-.39.39-1.02 0-1.41l-3.73-3.73 2.84-2.84c.47-.47.14-1.28-.53-1.28H6.5c-.55 0-1 .45-1 1v11.04c0 .67.81 1 1.28.53l3.1-3.1z"/></svg>
+        </button>
+        <button id="mode-pan-btn" class="mode-btn" data-i18n-title="modePanTitle" title="抓手平移模式 (H / 按住空格键)">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2c-1.1 0-2 .9-2 2v7H9V5c0-1.1-.9-2-2-2s-2 .9-2 2v10.5c0 2.5 2 4.5 4.5 4.5h4c2.5 0 4.5-2 4.5-4.5V11c0-1.1-.9-2-2-2s-2 .9-2 2v-1h-1V7c0-1.1-.9-2-2-2s-2 .9-2 2v4h-1V4c0-1.1-.9-2-2-2z"/></svg>
+        </button>
+      </div>
+
+      <!-- Right-side selected card inspector -->
+      <aside class="card-inspector hidden" id="card-size-section" aria-label="卡片尺寸">
+        <div class="card-inspector-header">
+          <span class="card-inspector-title">卡片尺寸</span>
+          <span class="card-inspector-badge">选中</span>
+        </div>
+        <div class="card-size-fields">
+          <div class="form-group">
+            <label for="card-width-input">宽度</label>
+            <input type="number" id="card-width-input" min="200" max="1800" step="10" placeholder="选择卡片">
+          </div>
+          <div class="form-group">
+            <label for="card-height-input">高度</label>
+            <input type="number" id="card-height-input" min="120" max="1400" step="10" placeholder="选择卡片">
+          </div>
+        </div>
+        <label class="checkbox-group card-size-checkbox">
+          <input type="checkbox" id="card-size-apply-all">
+          <span>应用到所有卡片</span>
+        </label>
+        <div class="card-size-axis-options" id="card-size-axis-options">
+          <label>
+            <input type="checkbox" id="card-size-apply-width" checked>
+            <span>应用宽度</span>
+          </label>
+          <label>
+            <input type="checkbox" id="card-size-apply-height" checked>
+            <span>应用高度</span>
+          </label>
+        </div>
+        <div class="card-size-status" id="card-size-status">先选中一张卡片</div>
+        <button id="focus-selected-card-btn" class="btn btn-outline inspector-focus-btn">聚焦选中卡片</button>
+        <button id="delete-selected-card-btn" class="btn btn-danger-outline inspector-delete-btn">删除选中卡片</button>
+      </aside>
+
+      <!-- Undo / redo history panel -->
+      <aside class="history-panel hidden" id="history-panel" aria-label="操作历史">
+        <div class="history-panel-header">
+          <span class="history-title">操作历史</span>
+          <button id="history-close-btn" class="history-close-btn" title="关闭">×</button>
+        </div>
+        <div class="history-actions">
+          <button id="history-panel-undo" class="btn btn-outline">撤销</button>
+          <button id="history-panel-redo" class="btn btn-outline">重做</button>
+        </div>
+        <div class="history-list" id="history-list"></div>
+      </aside>
+
+      <!-- Quick Canvas Overlay Controls -->
+      <div class="canvas-controls">
+        <div class="canvas-minimap" id="canvas-minimap" title="点击导航图移动视角">
+          <div class="minimap-stage" id="minimap-stage"></div>
+        </div>
+        <button id="view-mode-btn" class="view-mode-btn" data-i18n-title="viewModeTitle" title="切换 2D / 3D 视图">3D</button>
+        <button id="flatten-btn" data-i18n-title="flattenTitle" title="将所有卡片拉回同一平面 (Z=0)">⊟</button>
+        <button id="auto-arrange-btn" data-i18n-title="autoArrangeTitle" title="自动排列卡片（树形，不重叠）">⌗</button>
+        <button id="flow-toggle-btn" data-i18n-title="flowToggleTitle" title="连接线流动特效（按对话着色）">⇶</button>
+        <button id="nav-toggle-btn" title="显示/隐藏导航地图">&#128506;</button>
+        <button id="chat-mode-btn" data-i18n-title="chatModeTitle" title="切换聊天界面 / 画布视图">💬</button>
+        <button id="tree-mode-btn" data-i18n-title="treeModeTitle" title="切换树状图视图（左→右，可收起分支）">🌳</button>
+        <div class="divider"></div>
+        <button id="comment-mode-btn" title="批注">批</button>
+        <div class="divider"></div>
+        <button id="undo-btn" title="撤销">↶</button>
+        <button id="redo-btn" title="重做">↷</button>
+        <button id="history-toggle-btn" title="操作历史">≡</button>
+        <div class="divider"></div>
+        <button id="zoom-in-btn" data-i18n-title="zoomIn" title="放大">＋</button>
+        <button id="zoom-reset-btn" data-i18n-title="zoomReset" title="重置视角">100%</button>
+        <button id="zoom-out-btn" data-i18n-title="zoomOut" title="缩小">－</button>
+        <div class="divider"></div>
+        <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" data-i18n-title="toggleSidebar" title="折叠侧边栏">◀</button>
+      </div>
+    </main>
+
+    <!-- Always-visible tab to collapse / expand the sidebar -->
+    <button id="sidebar-edge-toggle" class="sidebar-edge-toggle" data-i18n-title="toggleSidebar" title="折叠侧边栏">◀</button>
+
+    <!-- Fullscreen card reader (double-click a card) -->
+    <div class="card-fullscreen hidden" id="card-fullscreen">
+      <div class="cf-inner">
+        <button class="cf-close" id="cf-close">✕</button>
+        <div class="cf-content" id="cf-content"></div>
+      </div>
+    </div>
+
+    <!-- System Diagnostics Modal -->
+    <div class="modal-overlay hidden" id="diagnostics-modal">
+      <div class="modal-card diagnostics-card">
+        <div class="modal-header">
+          <h2 data-i18n="diagnosticsTitle">系统诊断</h2>
+          <button class="modal-close" id="diagnostics-modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-info" data-i18n="diagnosticsDesc">查看当前模块、存储和画布状态。</p>
+          <div class="diagnostics-grid" id="diagnostics-grid"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="diagnostics-refresh-btn" class="btn btn-outline" data-i18n="diagnosticsRefresh">刷新</button>
+          <button id="diagnostics-mirror-btn" class="btn btn-outline" data-i18n="diagnosticsMirror">同步 IndexedDB 镜像</button>
+          <button id="diagnostics-close-btn" class="btn btn-primary" data-i18n="diagnosticsClose">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Log Importer Modal -->
+    <div class="modal-overlay hidden" id="import-modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 data-i18n="importTitle">导入已有聊天记录</h2>
+          <button class="modal-close" id="import-modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-info" data-i18n="importDesc">
+            粘贴您与其他 AI（如 ChatGPT, Claude, Gemini, DeepSeek 等）的对话文本或 JSON 导出数据。我们将为您把每一轮对话解析为一张张彼此相连的白板卡片，以便您直接基于任意一轮对话扩展新的分支。
+          </p>
+          
+          <div class="form-group">
+            <label for="parser-type" data-i18n="importFormat">解析格式</label>
+            <select id="parser-type">
+              <option value="auto" data-i18n="importAuto">智能自动识别 (推荐)</option>
+              <option value="json" data-i18n="importJson">标准 JSON 数组 (含 role 与 content)</option>
+              <option value="text" data-i18n="importText">纯文本聊天记录 (通过“人：/AI：”标识行分段)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="import-data" data-i18n="importDataLabel">对话数据内容</label>
+            <textarea id="import-data" placeholder=""></textarea>
+          </div>
+
+          <div class="form-group checkbox-group">
+            <input type="checkbox" id="import-arrange" checked>
+            <label for="import-arrange" data-i18n="importArrange">自动以水平流水线格式排布新卡片</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="import-cancel-btn" class="btn btn-outline" data-i18n="cancel">取消</button>
+          <button id="import-submit-btn" class="btn btn-primary" data-i18n="submit">解析并导入</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  
+  <script src="scripts/security.js?v=1"></script>
+  <script src="scripts/storage.js?v=2"></script>
+  <script src="scripts/importer.js?v=1"></script>
+  <script src="scripts/chat.js?v=51"></script>
+  <script src="app.js?v=74"></script>
+</body>
+</html>
