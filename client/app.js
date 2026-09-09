@@ -5,6 +5,10 @@ let nodes = [];
 let annotations = [];
 // knowledge-canvas 的非树状关系单独保存，避免破坏 qibu 既有 parentId 树模型。
 let knowledgeEdges = [];
+const knowledgeExtension = window.MindChatModules.createKnowledgeExtension({
+  getNodes: () => nodes,
+  getEdges: () => knowledgeEdges
+});
 let viewMode = '2d'; // '2d' or '3d'
 const DEFAULT_3D_ROTATE_X = -12;
 const DEFAULT_3D_ROTATE_Y = -32;
@@ -447,13 +451,11 @@ function loadKnowledgeEdges() {
 }
 
 function isConversationEdge(sourceId, targetId) {
-  return nodes.some(node =>
-    (node.id === targetId && node.parentId === sourceId)
-    || (node.id === sourceId && node.parentId === targetId));
+  return knowledgeExtension.isConversationEdge(sourceId, targetId);
 }
 
 function visibleKnowledgeEdges() {
-  return knowledgeEdges.filter(edge => edge && !isConversationEdge(edge.source, edge.target));
+  return knowledgeExtension.visibleEdges();
 }
 
 function exportKnowledgeInput() {
@@ -3211,13 +3213,7 @@ function drawKnowledgeConnection(edge) {
 }
 
 function knowledgeRelationColor(relation) {
-  return ({
-    '延伸': '#60a5fa',
-    '相似': '#a78bfa',
-    '对比': '#f59e0b',
-    '依赖': '#f87171',
-    '补充': '#34d399'
-  })[relation] || '#94a3b8';
+  return knowledgeExtension.relationColor(relation);
 }
 
 // User clicked "+ Follow-up"
@@ -3856,19 +3852,7 @@ async function linkCurrentKnowledgeCards() {
     const provider = config.provider === 'mock'
       ? 'dry-run'
       : (/localhost:11434|127\.0\.0\.1:11434/i.test(endpoint) ? 'local' : 'cloud');
-    const cards = nodes.map((node, index) => {
-      const knowledge = node.knowledge || {};
-      const title = knowledge.title || node.question || `对话 ${index + 1}`;
-      return {
-        id: node.id,
-        title,
-        category: knowledge.category || '其他',
-        summary_q: knowledge.summary_q || node.question || node.content || title,
-        summary_a: knowledge.summary_a || (node.question !== undefined ? node.content : node.content || ''),
-        keywords: knowledge.keywords || [],
-        source: knowledge.source || 'qibu'
-      };
-    });
+    const cards = nodes.map(knowledgeExtension.toKnowledgeCard);
     const response = await fetch('http://127.0.0.1:8791/api/knowledge/link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3883,7 +3867,7 @@ async function linkCurrentKnowledgeCards() {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || `桥接服务 HTTP ${response.status}`);
-    knowledgeEdges = Array.isArray(result.semanticEdges) ? result.semanticEdges : [];
+    knowledgeEdges = knowledgeExtension.mergeGraphEdges(result.semanticEdges);
     saveKnowledgeEdges();
     renderBoard();
     alert(currentLang === 'zh'

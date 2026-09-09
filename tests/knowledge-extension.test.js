@@ -1,0 +1,16 @@
+const assert = require('assert');
+const fs = require('fs');
+const vm = require('vm');
+const code = fs.readFileSync(require('path').join(__dirname, '../client/scripts/knowledge-extension.js'), 'utf8');
+const context = { window: {} };
+vm.createContext(context);
+vm.runInContext(code, context);
+const nodes = [{ id: 'a', parentId: null }, { id: 'b', parentId: 'a' }, { id: 'c', parentId: null }];
+const edges = [{ source: 'a', target: 'b', relation: '延伸' }, { source: 'a', target: 'c', relation: '依赖' }, { source: 'a', target: 'c', relation: '补充' }];
+const extension = context.window.MindChatModules.createKnowledgeExtension({ getNodes: () => nodes, getEdges: () => edges });
+assert.strictEqual(extension.visibleEdges().length, 2);
+assert.strictEqual(extension.visibleEdges()[0].target, 'c');
+assert.strictEqual(extension.relationColor('依赖'), '#f87171');
+assert.strictEqual(extension.mergeGraphEdges(edges).length, 2);
+assert.strictEqual(extension.toKnowledgeCard({ id: 'a', question: '问题' }, 0).summary_q, '问题');
+console.log('knowledge extension smoke: overlap filter, edge dedupe, card normalization passed');
