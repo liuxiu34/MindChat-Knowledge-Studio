@@ -818,6 +818,7 @@ const translations = {
     cardLayoutTitle: '切换宽扁卡片 / 上下排列',
     chatModeTitle: '切换聊天界面 / 画布视图',
     treeModeTitle: '切换树状图视图（左→右，可收起分支）',
+    knowledgeGraphTitle: '知识图谱',
     treeSubTreeBtn: '🌳 树状图',
     treeSubConvosBtn: '≣ 按对话列出',
     chatLocate: '↩ 在白板中查看',
@@ -920,6 +921,7 @@ const translations = {
     cardLayoutTitle: 'Toggle wide / flat cards (vertical stack)',
     chatModeTitle: 'Toggle chat interface / canvas view',
     treeModeTitle: 'Toggle tree view (left→right, collapsible branches)',
+    knowledgeGraphTitle: 'Knowledge Graph',
     treeSubTreeBtn: '🌳 Tree',
     treeSubConvosBtn: '≣ By conversation',
     chatLocate: '↩ View on canvas',
@@ -1086,6 +1088,7 @@ function renderBoard() {
   // Keep the chat/tree overlays in sync when the board changes (imports, AI replies, edits)
   if (chatMode) renderChatView();
   if (treeMode) renderTreeView();
+  if (knowledgeGraphMode) renderKnowledgeGraphView();
   updateCardSizePanel();
   updateManualLinkModeUI();
 }
@@ -1434,6 +1437,11 @@ const chatModule = window.MindChatModules.createChatModule({
 });
 
 function setChatMode(on) {
+  if (on && knowledgeGraphMode) {
+    knowledgeGraphMode = false;
+    document.body.classList.remove('knowledge-graph-mode');
+    document.getElementById('knowledge-graph-mode-btn')?.classList.remove('active');
+  }
   chatModule.setChatMode(on);
 }
 
@@ -1446,6 +1454,7 @@ function chatBranchLabel(branchNode) {
 }
 // ---- Tree view: collapsible tree + "list by conversation" sub-mode ----
 let treeMode = false;
+let knowledgeGraphMode = false;
 let treeSubMode = 'tree'; // 'tree' | 'convos'
 const treeHidden = new Set(); // node ids whose branch (subtree, incl. itself) is collapsed away
 
@@ -1465,6 +1474,11 @@ function setTreeSubMode(mode) {
 
 function setTreeMode(on) {
   treeMode = !!on;
+  if (treeMode && knowledgeGraphMode) {
+    knowledgeGraphMode = false;
+    document.body.classList.remove('knowledge-graph-mode');
+    document.getElementById('knowledge-graph-mode-btn')?.classList.remove('active');
+  }
   if (!treeMode) document.body.classList.remove('tree-convo-panel-open');
   if (treeMode) setCommentMode(false);
   if (treeMode && chatMode) {
@@ -1481,6 +1495,62 @@ function setTreeMode(on) {
   const nb = document.getElementById('tree-new-chat');
   if (nb) nb.classList.toggle('hidden', !treeMode || treeSubMode !== 'convos');
   if (treeMode) renderTreeView();
+}
+
+function setKnowledgeGraphMode(on) {
+  knowledgeGraphMode = !!on;
+  if (knowledgeGraphMode) {
+    if (chatMode) setChatMode(false);
+    if (treeMode) setTreeMode(false);
+    setCommentMode(false);
+  }
+  document.body.classList.toggle('knowledge-graph-mode', knowledgeGraphMode);
+  const button = document.getElementById('knowledge-graph-mode-btn');
+  if (button) button.classList.toggle('active', knowledgeGraphMode);
+  if (knowledgeGraphMode) renderKnowledgeGraphView();
+}
+
+function renderKnowledgeGraphView() {
+  const svg = document.getElementById('knowledge-graph-svg');
+  const count = document.getElementById('knowledge-graph-count');
+  if (!svg) return;
+  const semantic = visibleKnowledgeEdges();
+  const width = Math.max(960, canvasViewport?.clientWidth || 960);
+  const rowGap = 220;
+  const colGap = 360;
+  const cols = Math.max(1, Math.ceil(Math.sqrt(Math.max(1, nodes.length))));
+  const positions = new Map();
+  nodes.forEach((node, index) => {
+    positions.set(node.id, { x: 150 + (index % cols) * colGap, y: 110 + Math.floor(index / cols) * rowGap });
+  });
+  const height = Math.max(520, Math.ceil(nodes.length / cols) * rowGap + 180);
+  svg.setAttribute('width', String(width));
+  svg.setAttribute('height', String(height));
+  svg.innerHTML = `<defs><marker id="kg-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 1 L 8 5 L 0 9 z" fill="#a78bfa"></path></marker></defs>`;
+  semantic.forEach(edge => {
+    const source = positions.get(edge.source); const target = positions.get(edge.target);
+    if (!source || !target) return;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const midX = (source.x + target.x) / 2;
+    line.setAttribute('d', `M ${source.x} ${source.y} C ${midX} ${source.y}, ${midX} ${target.y}, ${target.x} ${target.y}`);
+    line.setAttribute('class', 'knowledge-graph-edge');
+    line.setAttribute('marker-end', 'url(#kg-arrow)');
+    svg.appendChild(line);
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', String(midX)); label.setAttribute('y', String((source.y + target.y) / 2 - 6)); label.setAttribute('class', 'knowledge-graph-label'); label.textContent = edge.relation || '补充'; svg.appendChild(label);
+  });
+  nodes.forEach((node, index) => {
+    const position = positions.get(node.id);
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', 'knowledge-graph-node'); group.setAttribute('transform', `translate(${position.x - 125}, ${position.y - 52})`); group.dataset.nodeId = node.id;
+    group.innerHTML = `<rect width="250" height="104" rx="12"></rect><text x="14" y="25" class="knowledge-graph-node-title"></text><text x="14" y="50" class="knowledge-graph-node-meta"></text><text x="14" y="76" class="knowledge-graph-node-body"></text>`;
+    group.querySelector('.knowledge-graph-node-title').textContent = node.knowledge?.title || node.question || `卡片 ${index + 1}`;
+    group.querySelector('.knowledge-graph-node-meta').textContent = node.knowledge?.category || (node.role === 'dialogue' ? '对话' : '卡片');
+    group.querySelector('.knowledge-graph-node-body').textContent = String(node.knowledge?.summary_a || node.content || '').slice(0, 32);
+    group.addEventListener('click', () => { setKnowledgeGraphMode(false); selectCardNode(node.id); centerOnNode(node.id); });
+    svg.appendChild(group);
+  });
+  if (count) count.textContent = `${nodes.length} 张卡片 · ${semantic.length} 条语义关系`;
 }
 
 function treeRealVisibleChildren(realId) {
@@ -3750,7 +3820,7 @@ function importKnowledgeData(data, sourceName = 'knowledge-canvas.json') {
 }
 
 async function analyzeFileWithBridge(file) {
-  const bridgeUrl = 'http://127.0.0.1:8787';
+  const bridgeUrl = 'http://127.0.0.1:8791';
   const raw = await file.arrayBuffer();
   const contentBase64 = btoa(String.fromCharCode(...new Uint8Array(raw)));
   const response = await fetch(`${bridgeUrl}/api/knowledge/analyze`, {
@@ -3759,16 +3829,13 @@ async function analyzeFileWithBridge(file) {
     body: JSON.stringify({
       filename: file.name,
       content_base64: contentBase64,
-      provider: 'local',
-      endpoint: 'http://127.0.0.1:11434',
-      model: 'qwen2.5:3b',
-      dry_run: true
+      provider: 'dry-run'
     })
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || `桥接服务 HTTP ${response.status}`);
-  if (!result.graph) throw new Error('桥接服务未返回知识图谱');
-  importKnowledgeData(result.graph, file.name);
+  if (!Array.isArray(result.cards)) throw new Error('桥接服务未返回知识卡片');
+  importKnowledgeData({ nodes: result.cards, edges: result.semanticEdges || [] }, file.name);
 }
 
 async function linkCurrentKnowledgeCards() {
@@ -3787,7 +3854,7 @@ async function linkCurrentKnowledgeCards() {
   try {
     const endpoint = config.endpoint || 'http://127.0.0.1:11434';
     const provider = config.provider === 'mock'
-      ? 'local'
+      ? 'dry-run'
       : (/localhost:11434|127\.0\.0\.1:11434/i.test(endpoint) ? 'local' : 'cloud');
     const cards = nodes.map((node, index) => {
       const knowledge = node.knowledge || {};
@@ -3802,7 +3869,7 @@ async function linkCurrentKnowledgeCards() {
         source: knowledge.source || 'qibu'
       };
     });
-    const response = await fetch('http://127.0.0.1:8787/api/knowledge/link', {
+    const response = await fetch('http://127.0.0.1:8791/api/knowledge/link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3816,7 +3883,7 @@ async function linkCurrentKnowledgeCards() {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || `桥接服务 HTTP ${response.status}`);
-    knowledgeEdges = Array.isArray(result.graph?.edges) ? result.graph.edges : [];
+    knowledgeEdges = Array.isArray(result.semanticEdges) ? result.semanticEdges : [];
     saveKnowledgeEdges();
     renderBoard();
     alert(currentLang === 'zh'
@@ -4475,6 +4542,13 @@ function setupEventListeners() {
   if (treeModeBtn) {
     treeModeBtn.addEventListener('click', () => {
       setTreeMode(!treeMode);
+    });
+  }
+
+  const knowledgeGraphModeBtn = document.getElementById('knowledge-graph-mode-btn');
+  if (knowledgeGraphModeBtn) {
+    knowledgeGraphModeBtn.addEventListener('click', () => {
+      setKnowledgeGraphMode(!knowledgeGraphMode);
     });
   }
 

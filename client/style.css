@@ -2831,6 +2831,33 @@ body.tree-mode .tree-view {
   display: flex;
 }
 
+.knowledge-graph-view {
+  display: none;
+  position: absolute;
+  inset: 0;
+  flex-direction: column;
+  background-color: var(--bg-primary);
+  z-index: 4;
+}
+
+body.knowledge-graph-mode .knowledge-graph-view { display: flex; }
+body.knowledge-graph-mode .canvas-grid,
+body.knowledge-graph-mode .chat-view,
+body.knowledge-graph-mode .tree-view { visibility: hidden; }
+.knowledge-graph-header { flex: 0 0 auto; display: flex; align-items: center; gap: 16px; padding: 12px 18px; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary); }
+.knowledge-graph-header span { color: var(--text-secondary); font-size: 12px; }
+.knowledge-graph-scroll { flex: 1; overflow: auto; }
+#knowledge-graph-svg { min-width: 100%; min-height: 100%; }
+.knowledge-graph-edge { fill: none; stroke: var(--neon-purple); stroke-width: 2.4; stroke-dasharray: 8 6; opacity: .78; }
+.knowledge-graph-label { fill: var(--neon-purple); font-size: 12px; text-anchor: middle; paint-order: stroke; stroke: var(--bg-primary); stroke-width: 4px; }
+.knowledge-graph-node { cursor: pointer; }
+.knowledge-graph-node rect { fill: var(--bg-secondary); stroke: var(--neon-blue); stroke-width: 1.5; filter: drop-shadow(0 4px 12px rgba(0,0,0,.3)); }
+.knowledge-graph-node:hover rect { stroke: var(--neon-green); stroke-width: 2.5; }
+.knowledge-graph-node-title { fill: var(--text-primary); font-size: 14px; font-weight: 700; }
+.knowledge-graph-node-meta { fill: var(--neon-blue); font-size: 11px; }
+.knowledge-graph-node-body { fill: var(--text-secondary); font-size: 11px; }
+.canvas-controls #knowledge-graph-mode-btn.active { background-color: var(--neon-purple); color: #fff; box-shadow: 0 0 10px var(--neon-purple); }
+
 .tree-modebar {
   flex: 0 0 auto;
   display: flex;

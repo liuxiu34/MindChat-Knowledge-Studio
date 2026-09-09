@@ -185,6 +185,12 @@
         </div>
       </div>
 
+      <!-- knowledge-canvas extension: semantic graph overlay on qibu base -->
+      <div class="knowledge-graph-view" id="knowledge-graph-view">
+        <div class="knowledge-graph-header"><strong data-i18n="knowledgeGraphTitle">知识图谱</strong><span id="knowledge-graph-count"></span></div>
+        <div class="knowledge-graph-scroll"><svg id="knowledge-graph-svg"></svg></div>
+      </div>
+
       <!-- Floating Toolbar for Pointer/Pan Mode -->
       <div class="mode-toolbar" id="mode-toolbar">
         <button id="mode-select-btn" class="mode-btn active" data-i18n-title="modeSelectTitle" title="选择与编辑模式 (V)">
@@ -255,6 +261,7 @@
         <button id="nav-toggle-btn" title="显示/隐藏导航地图">&#128506;</button>
         <button id="chat-mode-btn" data-i18n-title="chatModeTitle" title="切换聊天界面 / 画布视图">💬</button>
         <button id="tree-mode-btn" data-i18n-title="treeModeTitle" title="切换树状图视图（左→右，可收起分支）">🌳</button>
+        <button id="knowledge-graph-mode-btn" data-i18n-title="knowledgeGraphTitle" title="查看知识图谱">🕸️</button>
         <div class="divider"></div>
         <button id="comment-mode-btn" title="批注">批</button>
         <div class="divider"></div>
@@ -344,6 +351,6 @@
   <script src="scripts/storage.js?v=2"></script>
   <script src="scripts/importer.js?v=1"></script>
   <script src="scripts/chat.js?v=51"></script>
-  <script src="app.js?v=74"></script>
+  <script src="app.js?v=76"></script>
 </body>
 </html>
