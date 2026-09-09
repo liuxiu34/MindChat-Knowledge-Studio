@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MindChat Knowledge Studio</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <strong>MindChat Knowledge Studio</strong>
+    <select id="canvasSelect" aria-label="选择画布"></select>
+    <button id="newCanvas">＋ 画布</button>
+    <input id="searchInput" placeholder="搜索当前画布">
+    <label><input id="showConversation" type="checkbox" checked> 对话顺序</label>
+    <label><input id="showSemantic" type="checkbox" checked> 知识关系</label>
+    <span id="status">双层画布预览</span>
+  </header>
+  <main id="viewport"><svg id="edges" aria-hidden="true"></svg><section id="cards"></section></main>
+  <script src="board-model.js"></script>
+  <script src="workspace.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
